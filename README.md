@@ -993,8 +993,4 @@ Hasil pengujian menunjukkan:
 
 Dengan demikian, implementasi layanan aplikasi pada Soal 8 telah berhasil dilakukan sesuai dengan pengujian yang dilaksanakan.
 
-## 9. Demo: persiapan
-
-Uji 1 (kelompok, 15 menit): test case soal 1-8 + tanya jawab. Uji 2 (individu): tiap anggota menemukan, memperbaiki, dan menjelaskan satu kesalahan dalam 10 menit. Semua anggota wajib punya file `.pkt` di laptop dan memahami seluruh konfigurasi.
-
 ---
