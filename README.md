@@ -3,9 +3,10 @@
 Kelompok 10: 
 | No  | Nama                           | NRP        |
 | --- | ------------------------------ | ---------- |
-| 1   | Muhammmad Ridwan               | 5027251113 |
+| 1   | Khalifa S.                     | 5027251104 |
 | 2   | Nadia Iqlima                   | 5027251108 |
-| 3   | Khalifa S.                     | 5027251104 |
+| 3   | Muhammmad Ridwan               | 5027251113 |
+
 
 Tools: Cisco Packet Tracer 9.0.1 ·
 Skema pengalamatan: VLSM ·
