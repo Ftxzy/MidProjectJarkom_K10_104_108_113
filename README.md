@@ -11,7 +11,7 @@ Kelompok 10:
 Tools: Cisco Packet Tracer 9.0.1 ·
 Skema pengalamatan: VLSM ·
 
-> Link YT : 
+> Link YT : https://youtu.be/nX2dtkBjgS0
 
 ## Status pengerjaan
 
