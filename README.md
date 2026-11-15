@@ -1,9 +1,16 @@
 # Mid-Project Komdat Jarkom 2026/2027: Implementasi Jaringan Smart City Kota Surabaya
 
-Kelompok 10: Khalifa S. (5027251104), Nadia Iqlima (5027251108), Muh. Ridwan (5027251113)
-Tools: Cisco Packet Tracer 9.0.1 · Skema pengalamatan: VLSM · Deadline: Minggu, 1 November 2026, 23.59 WIB
+Kelompok 10: 
+| No  | Nama                           | NRP        |
+| --- | ------------------------------ | ---------- |
+| 1   | Muhammmad Ridwan               | 5027251113 |
+| 2   | Nadia Iqlima                   | 5027251108 |
+| 3   | Khalifa S.                     | 5027251104 |
 
-> Dokumen ini diperbarui bertahap. Bagian bertanda [TODO] belum dikerjakan, [BUKTI] menandai tempat screenshot yang harus ditempel.
+Tools: Cisco Packet Tracer 9.0.1 ·
+Skema pengalamatan: VLSM ·
+
+> Link YT : 
 
 ## Status pengerjaan
 
@@ -15,13 +22,15 @@ Tools: Cisco Packet Tracer 9.0.1 · Skema pengalamatan: VLSM · Deadline: Minggu
 | 4 | DHCP | 10 | Selesai. 11 LAN memakai pool di router; CCTV Kota memakai server DHCP di SERVER-DC dengan relay (`ip helper-address`) di R-DC |
 | 5 | NAT | 5 | Selesai. PAT di R-PUSAT; route `10.80.0.0/16` di R-ISP sudah dihapus |
 | 6 | Tunnel GRE | 10 | Selesai. Tunnel aktif; lalu lintas Balai Kota ↔ Pelabuhan sudah lewat tunnel (terverifikasi tracert); bonus IPsec: lisensi `securityk9` sudah aktif di R-PUSAT dan R-PELABUHAN, konfigurasi dan verifikasi selesai (ISAKMP SA `QM_IDLE`/`ACTIVE`, paket GRE terenkripsi dan terdekripsi) |
-| 7 | OSPF (file terpisah) | 10 | [TODO] |
-| 8 | Layanan aplikasi | 10 | [TODO] |
+| 7 | OSPF (file terpisah) | 10 | Selesai |
+| 8 | Layanan aplikasi | 10 | Selesai |
 | 9 | Demo | 25 | Persiapan |
 
 ---
 
 ## 1. Perancangan Topologi
+
+![Topologi](screenshots/topologi.png)
 
 ### 1.1 Pemilihan skema: VLSM
 
@@ -515,28 +524,477 @@ Hasil pengujian (R-PELABUHAN): `show crypto isakmp sa` menampilkan peer `10.80.2
 
 ---
 
-## 7. OSPF (file terpisah) [TODO]
+# Soal 7 - Implementasi OSPF
 
-Rencana: salin file utama setelah item 1-6 dan 8 selesai; link cadangan L7 R-DC ↔ R-UTARA (`10.80.241.56/30`, port Gi0/2 di kedua router); ganti route statis antar-router dengan OSPF; `passive-interface` di sisi LAN; default route hanya di R-PUSAT (`default-information originate`); uji putus salah satu link backbone (L1/L2/L7).
+## 1. Tujuan
 
-## 8. Layanan Aplikasi [TODO]
+Mengimplementasikan **Open Shortest Path First (OSPF)** pada jaringan Smart City Surabaya untuk menggantikan routing statis antarjaringan internal.
 
-Domain `k10.smartcity.lab`: DNS di SERVER-DC (`www`, `ftp`, `mail`); web "Portal Smart City Surabaya" di SERVER-BK; FTP di SERVER-DC dengan akun login (CCTV Kota dapat mengunggah); email antarpegawai Balai Kota dan Pelabuhan.
+Implementasi ini bertujuan untuk:
+
+- Mengaktifkan OSPF menggunakan Process ID 10 pada Area 0.
+- Menggunakan passive-interface pada interface LAN.
+- Membentuk adjacency antarrouter.
+- Mendistribusikan informasi routing secara dinamis.
+- Mengiklankan default route dari R-PUSAT.
+- Menguji konektivitas antarjaringan.
+- Menguji failover dan recovery ketika jalur utama mengalami gangguan.
+
+## 2. Topologi dan Konfigurasi OSPF
+
+![Topologi OSPF](screenshots/topologi7.png)
+
+
+### 2.1 Router ID
+
+| Router | Router ID |
+|---|---|
+| R-PUSAT | 1.1.1.1 |
+| R-DC | 2.2.2.2 |
+| R-UTARA | 3.3.3.3 |
+| R-SELATAN | 4.4.4.4 |
+| R-TIMUR | 5.5.5.5 |
+| R-BARAT | 6.6.6.6 |
+| R-PELABUHAN | 7.7.7.7 |
+
+### 2.2 Konfigurasi Dasar
+
+Konfigurasi OSPF diterapkan pada seluruh router dengan Process ID 10 dan Area 0.
+
+```cisco
+router ospf 10
+ router-id <ROUTER-ID>
+ network 10.80.0.0 0.0.255.255 area 0
+ passive-interface default
+```
+
+Interface yang digunakan untuk membentuk adjacency antarrouter diaktifkan kembali menggunakan perintah:
+
+```cisco
+no passive-interface <INTERFACE>
+```
+
+Dengan konfigurasi tersebut, interface LAN tetap passive sehingga tidak mengirimkan Hello Packet OSPF kepada perangkat end-user.
+
+### 2.3 Interface Aktif OSPF
+
+| Router | Interface Aktif |
+|---|---|
+| R-PUSAT | S0/1/1, S0/2/1, S0/3/1, S0/3/0, S0/2/0 |
+| R-DC | S0/3/0, G0/2 |
+| R-UTARA | S0/3/0, S0/3/1, G0/2 |
+| R-SELATAN | S0/3/0 |
+| R-TIMUR | S0/3/0 |
+| R-BARAT | S0/3/0 |
+| R-PELABUHAN | S0/3/0 |
+
+Interface LAN dikonfigurasi sebagai passive-interface.
+
+### 2.4 Konfigurasi Default Route
+
+Default route hanya dikonfigurasi pada R-PUSAT menuju ISP.
+
+```cisco
+ip route 0.0.0.0 0.0.0.0 203.0.113.42
+```
+
+Agar router lain dapat menggunakan default route tersebut, R-PUSAT mengiklankannya melalui OSPF:
+
+```cisco
+router ospf 10
+ default-information originate
+```
+
+Router lain menerima default route dengan tipe OSPF External Type 2 (O*E2).
+
+## 3. Pengujian OSPF Neighbor
+
+Pengujian dilakukan menggunakan perintah:
+
+```cisco
+show ip ospf neighbor
+```
+
+Hasil pengujian menunjukkan seluruh adjacency yang dibutuhkan berhasil mencapai status **FULL**.
+
+| Router | Neighbor yang Terhubung | Status |
+|---|---|---|
+| R-PUSAT | R-DC, R-UTARA, R-SELATAN, R-TIMUR, R-BARAT | FULL |
+| R-DC | R-PUSAT, R-UTARA | FULL |
+| R-UTARA | R-PUSAT, R-DC, R-PELABUHAN | FULL |
+| R-SELATAN | R-PUSAT | FULL |
+| R-TIMUR | R-PUSAT | FULL |
+| R-BARAT | R-PUSAT | FULL |
+| R-PELABUHAN | R-UTARA | FULL |
+
+Terdapat tujuh adjacency unik yang berhasil terbentuk sesuai topologi jaringan.
+
+### Bukti Pengujian
+
+- `show ip protocols` digunakan untuk memeriksa Process ID, Router ID, Area, network, dan passive-interface.
+- `show ip ospf neighbor` digunakan untuk memeriksa hubungan antarrouter.
+
+## 4. Pengujian Routing Table
+
+Pengujian dilakukan untuk memastikan jaringan internal telah dipelajari melalui OSPF, bukan lagi menggunakan static route internal.
+
+Perintah yang digunakan:
+
+```cisco
+show ip route
+show ip route ospf
+```
+
+Kode routing yang diperhatikan:
+
+| Kode | Keterangan |
+|---|---|
+| C | Connected |
+| L | Local |
+| O | OSPF |
+| O*E2 | Default route dari OSPF External Type 2 |
+| S* | Static default route |
+
+Hasil pada R-PUSAT menunjukkan jaringan internal telah dipelajari melalui OSPF. Contohnya:
+
+| Network | Jalur |
+|---|---|
+| 10.80.0.0/18 | OSPF |
+| 10.80.64.0/19 | OSPF |
+| 10.80.96.0/19 | OSPF |
+| 10.80.128.0/19 | OSPF |
+| 10.80.160.0/19 | OSPF |
+| 10.80.192.0/19 | OSPF |
+| 10.80.239.0/24 | OSPF |
+
+R-UTARA, R-DC, dan R-PELABUHAN juga berhasil mempelajari jaringan internal melalui OSPF.
+
+### Pengujian Default Route
+
+Pada R-BARAT digunakan perintah:
+
+```cisco
+show ip route 0.0.0.0
+```
+
+Hasil menunjukkan:
+
+- Routing protocol: OSPF 10
+- Route type: External Type 2
+- Next hop: 10.80.241.49
+- Router sumber: 1.1.1.1 (R-PUSAT)
+- Interface: Serial0/3/0
+- Metric: 1
+
+Dengan demikian, default route berhasil didistribusikan dari R-PUSAT ke R-BARAT melalui OSPF.
+
+## 5. Pengujian Konektivitas
+
+Pengujian konektivitas dilakukan dari R-PUSAT menuju beberapa jaringan internal menggunakan perintah `ping`.
+
+| Tujuan | Hasil | Rata-rata |
+|---|---|---|
+| 10.80.0.1 (R-UTARA) | 5/5 berhasil | 11 ms |
+| 10.80.239.1 (R-DC) | 5/5 berhasil | 15 ms |
+| 10.80.160.1 (R-PELABUHAN) | 5/5 berhasil | 24 ms |
+
+Seluruh pengujian mendapatkan tingkat keberhasilan 100%.
+
+## 6. Pengujian Failover
+
+### 6.1 Tujuan
+
+Pengujian failover dilakukan untuk memastikan OSPF dapat memilih jalur alternatif ketika jalur utama mengalami gangguan.
+
+Pengujian menggunakan jaringan CCTV R-DC:
+
+`10.80.96.0/19`
+
+Jalur utama menuju R-DC menggunakan L1, sedangkan jalur alternatif menggunakan L2 melalui R-UTARA dan L7.
+
+### 6.2 Kondisi Normal
+
+Ketika L1 aktif, R-PUSAT menggunakan jalur berikut:
+
+| Parameter | Hasil |
+|---|---|
+| Network tujuan | 10.80.96.0/19 |
+| Next hop | 10.80.241.34 |
+| Interface | Serial0/1/1 |
+| Metric | 65 |
+
+Jalur utama melewati L1 menuju R-DC.
+
+### 6.3 Kondisi Failover
+
+Simulasi gangguan dilakukan dengan mematikan interface L1 pada R-PUSAT:
+
+```cisco
+configure terminal
+interface Serial0/1/1
+shutdown
+```
+
+Setelah L1 dinonaktifkan, OSPF melakukan perhitungan ulang dan memilih jalur alternatif melalui R-UTARA dan L7.
+
+Hasil routing table:
+
+| Parameter | Hasil |
+|---|---|
+| Network tujuan | 10.80.96.0/19 |
+| Next hop | 10.80.241.38 |
+| Interface | Serial0/2/1 |
+| Metric | 66 |
+
+Jalur alternatif berhasil digunakan.
+
+Pengujian ping menuju IP R-DC `10.80.96.1` juga berhasil:
+
+- Paket terkirim: 5
+- Paket diterima: 5
+- Packet loss: 0%
+- Rata-rata waktu: 11 ms
+
+## 7. Pengujian Recovery
+
+Setelah pengujian failover, interface L1 diaktifkan kembali:
+
+```cisco
+configure terminal
+interface Serial0/1/1
+no shutdown
+```
+
+Setelah adjacency OSPF kembali terbentuk, R-PUSAT kembali menggunakan jalur utama.
+
+| Parameter | Hasil |
+|---|---|
+| Network tujuan | 10.80.96.0/19 |
+| Next hop | 10.80.241.34 |
+| Interface | Serial0/1/1 |
+| Metric | 65 |
+
+Pengujian ping setelah recovery:
+
+- Paket terkirim: 5
+- Paket diterima: 5
+- Packet loss: 0%
+- Rata-rata waktu: 14 ms
+
+Hal ini menunjukkan bahwa OSPF berhasil mengembalikan jalur routing ke jalur utama setelah koneksi L1 pulih.
+
+## 8. Catatan GRE dan IPsec
+
+Konfigurasi GRE/IPsec dari tahap sebelumnya tetap dipertahankan.
+
+Interface Tunnel0 masih dikonfigurasi, tetapi dibuat passive-interface pada OSPF. Oleh karena itu, pengujian Soal 7 ini tidak menyatakan bahwa adjacency OSPF dibentuk melalui GRE.
+
+Pengujian GRE/IPsec merupakan bagian terpisah dari verifikasi routing OSPF.
+
+## 9. Kesimpulan
+
+Berdasarkan seluruh pengujian yang dilakukan, implementasi OSPF pada jaringan Smart City Surabaya berhasil dilakukan.
+
+Hasil pengujian menunjukkan:
+
+1. Seluruh tujuh router telah menggunakan OSPF Process ID 10 pada Area 0.
+2. Adjacency antarrouter berhasil mencapai status FULL.
+3. Jaringan internal berhasil dipelajari melalui routing OSPF.
+4. Default route berhasil diiklankan oleh R-PUSAT dan diterima oleh router lain.
+5. Konektivitas antarjaringan internal berhasil diuji dengan packet loss 0%.
+6. Ketika jalur utama L1 terputus, OSPF berhasil mengalihkan trafik melalui jalur alternatif.
+7. Setelah L1 dipulihkan, OSPF kembali menggunakan jalur utama.
+
+Dengan demikian, implementasi OSPF dan pengujian failover pada Soal 7 berhasil memenuhi tujuan pengujian.
+
+## 10. Dokumentasi Screenshot
+
+Seluruh screenshot disimpan di direktori `screenshots/`.
+
+| No. | Nama File | Keterangan |
+|---|---|---|
+| 1 | ![OSPF Pusat](screenshots/s01_show_ip_protocols.png) | Konfigurasi OSPF R-PUSAT |
+| 2 | ![Neighbor OSPF](screenshots/s02.png) | Neighbor OSPF R-PUSAT |
+| 3 | ![Routing Normal](screenshots/s03_RoutingNormal.png) | Routing sebelum failover |
+| 4 | ![Routing Normal](screenshots/s04_Routingfailover.png) | Routing saat failover |
+| 5 | ![Routing Normal](screenshots/s05_PingFailover.png) | Ping saat failover |
+| 6 | ![Routing Normal](screenshots/s06_RoutingRecovery.png) | Routing setelah recovery |
+| 7 | ![Routing Normal](screenshots/s07_PingRecovery.png) | Ping setelah recovery |
+| 8 | ![Routing Normal](screenshots/s08_RoutingTable.png) | Routing table R-PUSAT |
+| 9 | ![Routing Normal](screenshots/s09_RoutingTableOSPFUtara.png) | Routing OSPF R-UTARA |
+| 10 | ![Routing Normal](screenshots/s10_OSPFProtocolsRUtara.png) | Konfigurasi OSPF R-UTARA |
+| 11 | ![Routing Normal](screenshots/s11_OSPFNeigbhorRUtara.png) | Neighbor OSPF R-UTARA |
+| 12 | ![Routing Normal](screenshots/s12_OSPFNeigbhorRDC.png) | Neighbor OSPF R-DC |
+| 13 | ![Routing Normal](screenshots/s13_RoutingTableOSPFRDC.png) | Routing OSPF R-DC |
+| 14 | ![Routing Normal](screenshots/s14_OSPF_ProtocolsRDC.png) | Konfigurasi OSPF R-DC |
+| 15 | ![Routing Normal](screenshots/s15_OSPFNeighborRPelabuhan.png) | Neighbor OSPF R-PELABUHAN |
+| 16 | ![Routing Normal](screenshots/s16_RoutingTableOSPFRPelabuhan.png) | Routing OSPF R-PELABUHAN |
+| 17 | ![Routing Normal](screenshots/s17_OSPFProtocolsRPelabuhan.png) | Konfigurasi OSPF R-PELABUHAN |
+| 18 | ![Routing Normal](screenshots/s18_OSPFNeighborRSelatan.png) | Neighbor OSPF R-SELATAN |
+| 19 | ![Routing Normal](screenshots/s19_OSPFProtocolsRSelatan.png) | Konfigurasi OSPF R-SELATAN |
+| 20 | ![Routing Normal](screenshots/s20_OSPFNeighborRTimur.png) | Neighbor OSPF R-TIMUR |
+| 21 | ![Routing Normal](screenshots/s21_OSPFProtocolsRTimur.png) | Konfigurasi OSPF R-TIMUR |
+| 22 | ![Routing Normal](screenshots/s22_OSPFNeighborRBarat.png) | Neighbor OSPF R-BARAT |
+| 23 | ![Routing Normal](screenshots/s23_OSPFProtocolsRBarat.png) | Konfigurasi OSPF R-BARAT |
+| 24 | ![Routing Normal](screenshots/s24_DefaultRouteRBarat.png) | Default route R-BARAT |
+
+# Soal 8 - Implementasi Layanan Aplikasi Smart City
+
+## 1. Tujuan
+
+Mengimplementasikan dan menguji layanan aplikasi pada jaringan Smart City Surabaya yang mencakup:
+
+1. DNS (Domain Name System).
+2. Web Server.
+3. FTP Server.
+4. Email Server.
+
+Implementasi dilakukan menggunakan Cisco Packet Tracer dengan pengujian komunikasi ant jaringan.
+
+## 2. Rancangan Layanan
+
+| Perangkat | IP Address | Layanan |
+|---|---|---|
+| SERVER-BK | `10.80.241.2` | Web Server dan Email Server |
+| SERVER-DC | `10.80.239.2` | DNS Server dan FTP Server |
+
+Domain utama yang digunakan:
+
+`k10.smartcity.lab`
+
+## 3. Implementasi DNS Server
+
+DNS Server dikonfigurasi pada SERVER-DC dengan alamat IP `10.80.239.2`.
+
+DNS digunakan untuk menerjemahkan nama domain menjadi alamat IP server tujuan.
+
+### DNS Records
+
+| Hostname | Domain | IP Address |
+|---|---|---|
+| www | `www.k10.smartcity.lab` | `10.80.241.2` |
+| ftp | `ftp.k10.smartcity.lab` | `10.80.239.2` |
+| mail | `mail.k10.smartcity.lab` | `10.80.241.2` |
+
+**Bukti konfigurasi DNS:**
+
+![SS-01 Konfigurasi DNS Server](screenshots/SS-01.png)
+
+![SS-02 DNS Records](screenshots/SS-02.png)
+
+## 4. Implementasi Web Server
+
+Web Server dikonfigurasi pada SERVER-BK dengan alamat IP `10.80.241.2`.
+
+Halaman web yang dibuat menggunakan judul:
+
+**Portal Smart City Surabaya**
+
+Pengujian dilakukan dengan mengakses website melalui browser menggunakan domain:
+
+`www.k10.smartcity.lab`
+
+Hasil pengujian menunjukkan bahwa halaman Portal Smart City Surabaya dapat diakses melalui domain tersebut.
+
+**Bukti pengujian Web Server:**
+
+![SS-03 Portal Smart City Surabaya](screenshots/SS-03.png)
+
+## 5. Implementasi FTP Server
+
+FTP Server dikonfigurasi pada SERVER-DC dengan alamat IP `10.80.239.2`.
+
+Akun FTP yang digunakan:
+
+| Parameter | Konfigurasi |
+|---|---|
+| Username | `k10ftp` |
+| Password | `K10ftp123` |
+| Read | Enabled |
+| Write | Enabled |
+| List | Enabled |
+
+### Pengujian FTP
+
+Pengujian dilakukan dari PC-CCTV yang berada pada jaringan CCTV Kota.
+
+Langkah pengujian:
+
+1. Mengakses FTP Server menggunakan perintah `ftp 10.80.239.2`.
+2. Login menggunakan akun `k10ftp`.
+3. Menampilkan daftar file menggunakan perintah `dir`.
+4. Mengunggah file `sampleFile.txt` menggunakan perintah `put sampleFile.txt`.
+5. Memastikan file berhasil ditransfer dan muncul pada direktori FTP Server.
+
+Hasil pengujian menunjukkan bahwa PC-CCTV berhasil terhubung dan melakukan upload file ke SERVER-DC.
+
+**Bukti pengujian FTP:**
+
+![SS-04 Konfigurasi FTP Server](screenshots/SS-04.png)
+
+![SS-05 Login FTP dari PC-CCTV](screenshots/SS-05.png)
+
+![SS-06 Upload sampleFile.txt](screenshots/SS-06.png)
+
+## 6. Implementasi Email Server
+
+Email Server dikonfigurasi pada SERVER-BK dengan alamat IP `10.80.241.2`.
+
+Layanan SMTP dan POP3 diaktifkan agar pengguna dapat mengirim dan menerima email.
+
+Domain email yang digunakan:
+
+`k10.smartcity.lab`
+
+### Akun Email
+
+| Instansi | Username | Alamat Email |
+|---|---|---|
+| Balai Kota | admin | `admin@k10.smartcity.lab` |
+| Pelabuhan | user | `user@k10.smartcity.lab` |
+
+### Pengujian Komunikasi Email
+
+Pengujian dilakukan untuk memastikan komunikasi email dua arah antara Balai Kota dan Pelabuhan.
+
+**Pengujian pertama: Balai Kota ke Pelabuhan**
+
+- Pengirim: `admin@k10.smartcity.lab`
+- Penerima: `user@k10.smartcity.lab`
+- Hasil: Email berhasil dikirim dan diterima oleh PC-KANTOR.
+
+**Pengujian kedua: Pelabuhan ke Balai Kota**
+
+- Pengirim: `user@k10.smartcity.lab`
+- Penerima: `admin@k10.smartcity.lab`
+- Hasil: Email berhasil dikirim dan diterima oleh PC-PEGAWAI.
+
+Pada pengujian awal sempat terjadi kegagalan pengiriman akibat kesalahan penulisan alamat email tujuan (`smartycity` вместо `smartcity`). Setelah alamat diperbaiki, pengiriman email berhasil dilakukan.
+
+**Bukti pengujian Email:**
+
+![SS-07 Konfigurasi Email Server](screenshots/SS-07.png)
+
+![SS-08 Email Balai Kota ke Pelabuhan](screenshots/SS-08.png)
+
+![SS-09 Email diterima Pelabuhan](screenshots/SS-09.png)
+
+
+## 7. Kesimpulan
+
+Berdasarkan implementasi dan pengujian yang telah dilakukan, seluruh layanan aplikasi pada jaringan Smart City Surabaya berhasil dikonfigurasi dan diuji.
+
+Hasil pengujian menunjukkan:
+
+1. DNS berhasil menyediakan resolusi nama domain untuk layanan yang dikonfigurasi.
+2. Web Server berhasil menampilkan Portal Smart City Surabaya melalui domain.
+3. FTP Server berhasil menerima koneksi dan upload file dari PC-CCTV.
+4. Email Server berhasil memfasilitasi komunikasi dua arah antara Balai Kota dan Pelabuhan.
+
+Dengan demikian, implementasi layanan aplikasi pada Soal 8 telah berhasil dilakukan sesuai dengan pengujian yang dilaksanakan.
 
 ## 9. Demo: persiapan
 
 Uji 1 (kelompok, 15 menit): test case soal 1-8 + tanya jawab. Uji 2 (individu): tiap anggota menemukan, memperbaiki, dan menjelaskan satu kesalahan dalam 10 menit. Semua anggota wajib punya file `.pkt` di laptop dan memahami seluruh konfigurasi.
 
 ---
-
-## Catatan perubahan
-
-| Tanggal | Perubahan |
-|---|---|
-| 2026-10-29 | File `.pkt` dibaca: topologi, IP, dan static route sesuai tabel VLSM; 0 dari 182 pasangan LAN gagal. Ditemukan: hostname CLI belum diset, label LAN belum ada, 2 route belum lewat tunnel, R-ISP masih punya route ke `10.80.0.0/16`. |
-| 2026-10-29 | Route tunnel diperbaiki: R-PUSAT ke `10.80.240.0/25` via `192.168.10.2`, R-PELABUHAN ke `10.80.224.0/21` via `192.168.10.1`. Diverifikasi dengan 2 tracert (PC-PEGAWAI → PC-KANTOR, PC-KANTOR → SERVER-BK); keduanya melewati hop tunnel. |
-| 2026-10-29 | Bonus IPsec: lisensi `securityk9` diaktifkan dan reload pada R-PUSAT dan R-PELABUHAN (kolom *Current* = securityk9). Konfigurasi crypto (ISAKMP, transform-set, crypto map) disiapkan; menunggu eksekusi dan verifikasi. |
-| 2026-10-29 | Bonus IPsec dikonfigurasi di R-PUSAT (`Serial0/2/1`) dan R-PELABUHAN (`Serial0/3/0`) dengan mode tunnel bawaan (`mode transport` tidak tersedia). Verifikasi: ISAKMP SA `QM_IDLE`/`ACTIVE`, `#pkts encaps/decaps` > 0, ping PC-PEGAWAI → PC-KANTOR berhasil. |
-| 2026-10-29 | Bukti tambahan soal 6: tracert PC-SCADA → PC-PEGAWAI lewat tunnel; `show crypto isakmp sa` di R-PELABUHAN `QM_IDLE`/`ACTIVE`. Soal 6 (termasuk bonus IPsec) dinyatakan selesai. |
-| 2026-10-30 | Soal 5: PAT dikonfigurasi di R-PUSAT (outside `Serial0/1/0`, ACL 1 = `10.80.0.0/16`), route `10.80.0.0/16` di R-ISP dihapus. Ping ke 8.8.8.8 berhasil dari PC-PEGAWAI, PC-SCADA, PC-LALIN; `show ip nat translations` menunjukkan terjemahan ke `203.0.113.41`. Soal 5 selesai. |
-| 2026-10-30 | Soal 4: pool DHCP di 6 router untuk 11 LAN pengguna (DNS `10.80.239.2`, asumsi SERVER-DC); CCTV Kota lewat server DHCP SERVER-DC + `ip helper-address` di R-DC (Gi0/0). Seluruh PC uji menerima alamat, gateway, dan DNS. Soal 4 selesai. |
